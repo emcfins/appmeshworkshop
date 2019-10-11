@@ -67,15 +67,28 @@ mainSteps:
                 --env APPMESH_VIRTUAL_NODE_NAME=mesh/{{meshName}}/virtualNode/{{vNodeName}} \
                 --env AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
                 --env AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                --env ENABLE_ENVOY_XRAY_TRACING=1  \                
+                --env ENABLE_ENVOY_XRAY_TRACING=1 \
                 --env AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN \
                 --log-driver="awslogs" \
                 --log-opt awslogs-create-group=true \
                 --log-opt awslogs-region={{region}} \
-                --log-opt awslogs-stream-prefix=envoy \
+                --log-opt awslogs-stream=envoy \
                 --log-opt awslogs-group=appmesh-workshop-frontend-envoy \
                 -u 1337 --network host \
                 111345817488.dkr.ecr.{{region}}.amazonaws.com/aws-appmesh-envoy:v1.11.1.1-prod
+- action: aws:runShellScript
+      name: installXRay
+      inputs:
+        runCommand: 
+          - |
+            #! /bin/bash -ex
+
+            XRAY_HOST=https://s3.dualstack.{{region}}.amazonaws.com
+            XRAY_PATH=aws-xray-assets.{{region}}/xray-daemon/aws-xray-daemon-3.x.rpm
+
+            # Install and run xray daemon
+            sudo curl $XRAY_HOST/$XRAY_PATH -o /tmp/xray.rpm
+            sudo yum install -y /tmp/xray.rpm                
 - action: aws:runShellScript
       name: enableRouting
       inputs:
@@ -127,19 +140,6 @@ mainSteps:
                       -p tcp \
                       -m addrtype ! --src-type LOCAL \
                       -j APPMESH_INGRESS
-- action: aws:runShellScript
-      name: installXRay
-      inputs:
-        runCommand: 
-          - |
-            #! /bin/bash -ex
-
-            XRAY_HOST=https://s3.dualstack.{{region}}.amazonaws.com
-            XRAY_PATH=aws-xray-assets.{{region}}/xray-daemon/aws-xray-daemon-3.x.rpm
-
-            # Install and run xray daemon
-            curl $XRAY_HOST/$XRAY_PATH -o /tmp/xray.rpm
-            sudo yum install -y /tmp/xray.rpm
 
 EOF
 # Create ssm document #
@@ -163,7 +163,7 @@ aws ssm create-association \
       --max-concurrency 50% \
       --parameters \
           "region=$AWS_REGION,
-            meshName=appmesh-workshop,v
-            NodeName=frontend-v1,
+            meshName=appmesh-workshop,
+            vNodeName=frontend-v1,
             appPorts=3000"
 ```
